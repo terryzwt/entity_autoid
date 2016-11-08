@@ -1,0 +1,108 @@
+<?php
+
+/**
+ * @file
+ * Module file.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function entity_autoid_menu() {
+  $items = array();
+  // $items['admin/config/entity-autoid'] = array(
+  //   'title' => 'Enttiy Auto ID configuration',
+  //   'access arguments' => array('administer site configuration'),
+  //   'position' => 'left',
+  //   'weight' => -100,
+  //   'page callback' => 'system_admin_menu_block_page',
+  //   'file' => 'system.admin.inc',
+  //   'file path' => drupal_get_path('module', 'system'),
+  // );
+  $items['admin/config/entity-autoid'] = array(
+    'title' => 'entity autoid list',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('entity_autoid_overview_form'),
+    'file' => 'entity_autoid.admin.inc',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/entity-autoid/create'] = array(
+    'title' => 'Create new ID schema',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('entity_autoid_form'),
+    'file' => 'entity_autoid.admin.inc',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_ACTION,
+  );
+  $items['admin/config/entity-autoid/%autoid/edit'] = array(
+    'title' => 'Edit autoid',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('entity_autoid_form', 3),
+    'file' => 'entity_autoid.admin.inc',
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+/**
+ * load function.
+ */
+function autoid_load($sid) {
+  $info = db_select('entity_flow_id_schema', 'f')
+  ->fields('f')
+  ->condition('sid', $sid)
+  ->execute()
+  ->fetchObject();
+  return $info ? $info : FALSE;
+}
+
+/**
+ * Main function provide by this module.
+ */
+function entity_autoid_get_serial($entity_type, $entity) {
+  $wrapper = entity_metadata_wrapper($entity_type, $entity);
+  $bundle = $wrapper->getBundle();
+
+  $entity_info = entity_get_info($entity_type);
+  $entity_token_type = $entity_info['token type'];
+  //do check
+  $info = db_select('entity_flow_id_schema', 'f')
+    ->fields('f')
+    ->condition('entity_type', $entity_type)
+    ->condition('bundle', $bundle)
+    ->execute()
+    ->fetchObject();
+
+  if ($info) {
+    $id_key = token_replace($info->format, array($entity_token_type => $entity));
+    $id_seed = $info->id_seed;
+    $id_seed += 1;
+    $id_value = sprintf($id_key . $info->seed_format, $id_seed);
+    //db_merge is always amazing.
+    db_merge('entity_flow_id_schema')
+      ->key(array('entity_type' => $entity_type, 'bundle' => $bundle))
+      ->insertFields(
+        array(
+          'entity_type' => $entity_type,
+          'bundle' => $bundle,
+          'id_key' => $id_key,
+          'id_value' => $id_value,
+          'id_seed' => $id_seed,
+        )
+      )
+      ->updateFields(
+        array(
+          'id_key' => $id_key,
+          'id_value' => $id_value,
+          'id_seed' => $id_seed,
+        )
+      )
+      //->expression('id_seed', 'id_seed + 1')
+      ->execute();
+    return db_query('SELECT id_value FROM {entity_flow_id_schema} WHERE entity_type=:entity_type AND bundle=:bundle', array(':entity_type' => $entity_type, 'bundle' => $bundle))->fetchField();
+  }
+  else {
+    return FALSE;
+  }
+}

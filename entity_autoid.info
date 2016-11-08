@@ -1,0 +1,5 @@
+name = Entity Flow id
+description = It's a module for coders: generate entity based serial numbers
+configure = admin/config/entity-autoid
+dependencies[] = entity_token
+core = 7.x
