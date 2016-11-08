@@ -49,11 +49,12 @@ function entity_autoid_menu() {
  * load function.
  */
 function autoid_load($sid) {
+  //TODO::add static for better performance.
   $info = db_select('entity_flow_id_schema', 'f')
-  ->fields('f')
-  ->condition('sid', $sid)
-  ->execute()
-  ->fetchObject();
+    ->fields('f')
+    ->condition('sid', $sid)
+    ->execute()
+    ->fetchObject();
   return $info ? $info : FALSE;
 }
 
